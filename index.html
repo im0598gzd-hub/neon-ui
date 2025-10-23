@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minimal Web UI (vA6)</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      margin: 2em;
+    }
+    h1 {
+      color: #79c0ff;
+    }
+    input, button, textarea {
+      background: #161b22;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 0.4em;
+    }
+    button {
+      cursor: pointer;
+    }
+    pre {
+      background: #161b22;
+      padding: 1em;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    .key {
+      width: 350px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Minimal Web UI (vA6)</h1>
+  <p>API_BASE: <code id="apiBase">https://neon-api-3a0h.onrender.com</code></p>
+
+  <h3>Bearer Key</h3>
+  <input type="password" id="apiKey" class="key" placeholder="Enter Bearer Key" />
+  <button onclick="saveKey()">Save</button>
+  <button onclick="clearKey()">Clear</button>
+
+  <h3>Endpoints</h3>
+  <button onclick="checkHealth()">/health</button>
+  <button onclick="fetchNotes()">/notes</button>
+
+  <h3>Result</h3>
+  <pre id="output">Press a button above to test API.</pre>
+
+  <script>
+    const API_BASE = "https://neon-api-3a0h.onrender.com";
+    const out = document.getElementById("output");
+
+    function getKey() {
+      return sessionStorage.getItem("bearerKey") || "";
+    }
+
+    function saveKey() {
+      const val = document.getElementById("apiKey").value.trim();
+      if (!val) return alert("Empty key");
+      sessionStorage.setItem("bearerKey", val);
+      alert("Saved to session (will clear when tab closes)");
+    }
+
+    function clearKey() {
+      sessionStorage.clear();
+      alert("All keys cleared");
+    }
+
+    async function checkHealth() {
+      out.textContent = "Checking /health ...";
+      try {
+        const res = await fetch(API_BASE + "/health");
+        const data = await res.json();
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        out.textContent = "Error: " + e;
+      }
+    }
+
+    async function fetchNotes() {
+      out.textContent = "Fetching /notes ...";
+      const key = getKey();
+      if (!key) return alert("Please enter and save your Bearer key first");
+      try {
+        const res = await fetch(API_BASE + "/notes", {
+          headers: { Authorization: "Bearer " + key },
+        });
+        const data = await res.json();
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        out.textContent = "Error: " + e;
+      }
+    }
+  </script>
+</body>
+</html>
