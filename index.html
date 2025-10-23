@@ -1,101 +1,227 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Minimal Web UI (vA6)</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Minimal Web UI (vA6) — READ/WRITE</title>
   <style>
-    body {
-      font-family: system-ui, sans-serif;
-      background: #0d1117;
-      color: #e6edf3;
-      margin: 2em;
-    }
-    h1 {
-      color: #79c0ff;
-    }
-    input, button, textarea {
-      background: #161b22;
-      color: #e6edf3;
-      border: 1px solid #30363d;
-      border-radius: 6px;
-      padding: 0.4em;
-    }
-    button {
-      cursor: pointer;
-    }
-    pre {
-      background: #161b22;
-      padding: 1em;
-      border-radius: 6px;
-      overflow-x: auto;
-    }
-    .key {
-      width: 350px;
-    }
+    :root{--bg:#0d1117;--fg:#e6edf3;--muted:#8b949e;--line:#30363d;--card:#161b22;--blue:#58a6ff;--green:#2ea043;--red:#f85149}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:1100px;margin:0 auto;padding:20px}
+    h1{margin:0 0 6px;color:#79c0ff}
+    .sub{color:var(--muted);margin:0 0 16px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+    label{display:block;font-weight:600;margin:10px 0 6px}
+    input,textarea{width:100%;background:#0f1420;border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:10px 12px}
+    textarea{resize:vertical}
+    .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    button{background:#0f1420;border:1px solid var(--line);color:var(--fg);padding:8px 12px;border-radius:10px;cursor:pointer}
+    button.primary{background:var(--green);border-color:var(--green);color:#fff}
+    button.danger{border-color:var(--red);color:var(--red)}
+    button.ghost{color:var(--muted)}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted)}
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+    .code{background:#0b1020;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:260px}
+    .pwline{display:flex;gap:6px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-  <h1>Minimal Web UI (vA6)</h1>
-  <p>API_BASE: <code id="apiBase">https://neon-api-3a0h.onrender.com</code></p>
+  <header class="wrap">
+    <h1>Minimal Web UI (vA6)</h1>
+    <p class="sub">「人が触れても壊れない最小の窓」— GitHub Pages（UI） × Render（API）</p>
+  </header>
 
-  <h3>Bearer Key</h3>
-  <input type="password" id="apiKey" class="key" placeholder="Enter Bearer Key" />
-  <button onclick="saveKey()">Save</button>
-  <button onclick="clearKey()">Clear</button>
+  <main class="wrap grid">
+    <!-- 左：鍵・ヘルス -->
+    <section class="card">
+      <h2>🔐 鍵（Bearer）</h2>
+      <p class="mono">※ 鍵は <code>sessionStorage</code> のみ（一時保存）。<br>※ 画面共有・録画時に鍵を<strong>表示しない</strong>でください。</p>
 
-  <h3>Endpoints</h3>
-  <button onclick="checkHealth()">/health</button>
-  <button onclick="fetchNotes()">/notes</button>
+      <label for="readToken">READ トークン</label>
+      <div class="pwline">
+        <input id="readToken" type="password" placeholder="READ 用の Bearer 値" autocomplete="off">
+        <button id="showRead" class="ghost" type="button">表示(3s)</button>
+      </div>
 
-  <h3>Result</h3>
-  <pre id="output">Press a button above to test API.</pre>
+      <label for="writeToken" style="margin-top:6px">WRITE トークン</label>
+      <div class="pwline">
+        <input id="writeToken" type="password" placeholder="WRITE 用の Bearer 値" autocomplete="off">
+        <button id="showWrite" class="ghost" type="button">表示(3s)</button>
+      </div>
+
+      <div class="row" style="margin-top:8px">
+        <button id="saveTokens" class="primary" type="button">鍵を保存（このタブ内）</button>
+        <button id="clearTokens" class="danger" type="button">鍵をすべて消去</button>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
+
+      <h2>🩺 /health</h2>
+      <div class="row">
+        <button id="btnHealth" type="button">/health を確認</button>
+        <span id="healthStatus" class="mono"></span>
+      </div>
+      <pre id="healthRaw" class="code"></pre>
+    </section>
+
+    <!-- 右：notes 一覧 + 投稿 -->
+    <section class="card">
+      <h2>🗒️ /notes（一覧）</h2>
+      <div class="row">
+        <button id="btnLoad" type="button">一覧を読み込む（READ）</button>
+        <span id="loadStatus" class="mono"></span>
+      </div>
+      <table class="table" id="notesTable">
+        <thead><tr><th>ID</th><th>Content</th><th>Tags</th><th>Created</th><th>Updated</th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
+
+      <h2>✍️ /notes（新規投稿）</h2>
+      <label for="content">content</label>
+      <textarea id="content" rows="4" placeholder="テキストを入力"></textarea>
+      <label for="tags">tags（カンマ区切り）</label>
+      <input id="tags" type="text" placeholder="例: project,idea">
+
+      <div class="row" style="margin-top:8px">
+        <button id="btnPost" class="primary" type="button">投稿する（WRITE）</button>
+        <span id="postStatus" class="mono"></span>
+      </div>
+      <pre id="postRaw" class="code"></pre>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <p class="mono">API_BASE: <code id="apiShown"></code> / Origin: <code id="originShown"></code></p>
+  </footer>
 
   <script>
+    // === 固定：Render API ベース ===
     const API_BASE = "https://neon-api-3a0h.onrender.com";
-    const out = document.getElementById("output");
 
-    function getKey() {
-      return sessionStorage.getItem("bearerKey") || "";
+    // === DOM ===
+    const $ = (id) => document.getElementById(id);
+    const readInput = $("readToken");
+    const writeInput = $("writeToken");
+    const healthStatus = $("healthStatus");
+    const healthRaw = $("healthRaw");
+    const loadStatus = $("loadStatus");
+    const notesBody = document.querySelector("#notesTable tbody");
+    const postStatus = $("postStatus");
+    const postRaw = $("postRaw");
+
+    $("apiShown").textContent = API_BASE;
+    $("originShown").textContent = location.origin;
+
+    // === sessionStorage keys ===
+    const KEY_READ = "READ_TOKEN";
+    const KEY_WRITE = "WRITE_TOKEN";
+
+    // 初期復元（値は表示しない）
+    try {
+      if (sessionStorage.getItem(KEY_READ)) readInput.value = "********";
+      if (sessionStorage.getItem(KEY_WRITE)) writeInput.value = "********";
+    } catch {}
+
+    // 3秒だけ表示
+    function reveal3s(input, getter) {
+      const val = getter();
+      if (!val) return;
+      const t = input.type;
+      const prev = input.value;
+      input.type = "text";
+      input.value = val;
+      setTimeout(() => { input.type = t; input.value = "********"; }, 3000);
     }
+    $("showRead").onclick = () => reveal3s(readInput, () => sessionStorage.getItem(KEY_READ) || "");
+    $("showWrite").onclick = () => reveal3s(writeInput, () => sessionStorage.getItem(KEY_WRITE) || "");
 
-    function saveKey() {
-      const val = document.getElementById("apiKey").value.trim();
-      if (!val) return alert("Empty key");
-      sessionStorage.setItem("bearerKey", val);
-      alert("Saved to session (will clear when tab closes)");
-    }
+    // 保存
+    $("saveTokens").onclick = () => {
+      const r = readInput.value.includes("*") ? (sessionStorage.getItem(KEY_READ) || "") : readInput.value.trim();
+      const w = writeInput.value.includes("*") ? (sessionStorage.getItem(KEY_WRITE) || "") : writeInput.value.trim();
+      if (r) sessionStorage.setItem(KEY_READ, r);
+      if (w) sessionStorage.setItem(KEY_WRITE, w);
+      alert("鍵を保存しました（このタブ内）");
+      if (r) readInput.value = "********";
+      if (w) writeInput.value = "********";
+    };
 
-    function clearKey() {
-      sessionStorage.clear();
-      alert("All keys cleared");
-    }
+    // すべて消去
+    $("clearTokens").onclick = () => {
+      try { sessionStorage.clear(); } catch {}
+      readInput.value = ""; writeInput.value = "";
+      alert("鍵をすべて消去しました。");
+    };
 
-    async function checkHealth() {
-      out.textContent = "Checking /health ...";
+    // fetch ユーティリティ（キーは渡されたときのみ付与）
+    async function jreq(path, method="GET", token="", body=null) {
+      const url = API_BASE + path;
+      const headers = {"Content-Type":"application/json"};
+      if (token) headers["Authorization"] = "Bearer " + token;
       try {
-        const res = await fetch(API_BASE + "/health");
-        const data = await res.json();
-        out.textContent = JSON.stringify(data, null, 2);
+        const res = await fetch(url, {method, headers, body: body?JSON.stringify(body):undefined});
+        const txt = await res.text();
+        let data; try { data = txt ? JSON.parse(txt) : null } catch { data = txt }
+        return {ok: res.ok, status: res.status, headers: res.headers, data};
       } catch (e) {
-        out.textContent = "Error: " + e;
+        return {ok:false, status:0, headers:new Headers(), data:{error:String(e)}};
       }
     }
 
-    async function fetchNotes() {
-      out.textContent = "Fetching /notes ...";
-      const key = getKey();
-      if (!key) return alert("Please enter and save your Bearer key first");
-      try {
-        const res = await fetch(API_BASE + "/notes", {
-          headers: { Authorization: "Bearer " + key },
-        });
-        const data = await res.json();
-        out.textContent = JSON.stringify(data, null, 2);
-      } catch (e) {
-        out.textContent = "Error: " + e;
+    // /health
+    $("btnHealth").onclick = async () => {
+      healthStatus.textContent = "loading...";
+      healthRaw.textContent = "";
+      const r = await jreq("/health");
+      healthStatus.textContent = r.ok ? "OK" : `ERR(${r.status})`;
+      healthRaw.textContent = typeof r.data === "string" ? r.data : JSON.stringify(r.data, null, 2);
+    };
+
+    // /notes 一覧（READ）
+    $("btnLoad").onclick = async () => {
+      loadStatus.textContent = "loading...";
+      notesBody.innerHTML = "";
+      const token = sessionStorage.getItem(KEY_READ) || "";
+      if (!token) { loadStatus.textContent = "READトークン未設定"; return; }
+      const r = await jreq("/notes", "GET", token);
+      if (!r.ok) { loadStatus.textContent = `ERR(${r.status})`; return; }
+      const rows = Array.isArray(r.data) ? r.data : (r.data?.results || []);
+      if (!rows || rows.length === 0) { loadStatus.textContent = "0件"; return; }
+      for (const it of rows) {
+        const tr = document.createElement("tr");
+        const td = (t)=>{const d=document.createElement("td"); d.textContent=(t??""); return d};
+        tr.appendChild(td(it.id));
+        tr.appendChild(td(it.content));
+        tr.appendChild(td(Array.isArray(it.tags)?it.tags.join(","):""));
+        tr.appendChild(td(it.created_at));
+        tr.appendChild(td(it.updated_at));
+        notesBody.appendChild(tr);
       }
-    }
+      loadStatus.textContent = `${rows.length}件`;
+    };
+
+    // /notes 投稿（WRITE）
+    $("btnPost").onclick = async () => {
+      postStatus.textContent = "posting...";
+      postRaw.textContent = "";
+      const token = sessionStorage.getItem(KEY_WRITE) || "";
+      if (!token) { postStatus.textContent = "WRITEトークン未設定"; return; }
+      const content = $("content").value.trim();
+      const tags = ($("tags").value.trim() || "")
+        .split(",").map(s=>s.trim()).filter(Boolean);
+      const r = await jreq("/notes", "POST", token, {content, tags});
+      postStatus.textContent = r.ok ? "OK" : `ERR(${r.status})`;
+      postRaw.textContent = typeof r.data === "string" ? r.data : JSON.stringify(r.data, null, 2);
+      if (r.ok) $("btnLoad").click(); // 成功したら一覧を更新
+    };
+
+    // 重要：鍵を console.log や URL に出さない（何も出力しない）
   </script>
 </body>
 </html>
