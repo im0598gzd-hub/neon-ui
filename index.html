@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Minimal Web UI (vA6) — READ/WRITE</title>
+  <title>Minimal Web UI (vA6) — READ / WRITE(ADMIN)</title>
   <style>
-    :root{--bg:#0d1117;--fg:#e6edf3;--muted:#8b949e;--line:#30363d;--card:#161b22;--blue:#58a6ff;--green:#2ea043;--red:#f85149}
+    :root{--bg:#0d1117;--fg:#e6edf3;--muted:#8b949e;--line:#30363d;--card:#161b22;--blue:#58a6ff;--green:#2ea043;--red:#f85149;--amber:#d29922}
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
     .wrap{max-width:1100px;margin:0 auto;padding:20px}
@@ -21,11 +21,16 @@
     button.primary{background:var(--green);border-color:var(--green);color:#fff}
     button.danger{border-color:var(--red);color:var(--red)}
     button.ghost{color:var(--muted)}
+    button[disabled]{opacity:.6;cursor:not-allowed}
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted)}
     .table{width:100%;border-collapse:collapse}
     .table th,.table td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
     .code{background:#0b1020;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:260px}
     .pwline{display:flex;gap:6px}
+    .badge{display:inline-block;padding:2px 6px;border-radius:999px;font-size:12px;border:1px solid var(--line);color:#fff}
+    .badge.del{background:rgba(248,81,73,.15);border-color:var(--red);color:#ffaba8}
+    .muted{color:var(--muted)}
+    .strike{opacity:.8;text-decoration:line-through}
     @media (max-width:900px){.grid{grid-template-columns:1fr}}
   </style>
 </head>
@@ -47,9 +52,9 @@
         <button id="showRead" class="ghost" type="button">表示(3s)</button>
       </div>
 
-      <label for="writeToken" style="margin-top:6px">WRITE トークン</label>
+      <label for="writeToken" style="margin-top:6px">WRITE/ADMIN トークン</label>
       <div class="pwline">
-        <input id="writeToken" type="password" placeholder="WRITE 用の Bearer 値" autocomplete="off">
+        <input id="writeToken" type="password" placeholder="ADMIN（削除・復元・投稿）用 Bearer 値" autocomplete="off">
         <button id="showWrite" class="ghost" type="button">表示(3s)</button>
       </div>
 
@@ -71,12 +76,22 @@
     <!-- 右：notes 一覧 + 投稿 -->
     <section class="card">
       <h2>🗒️ /notes（一覧）</h2>
+
       <div class="row">
-        <button id="btnLoad" type="button">一覧を読み込む（READ）</button>
+        <button id="btnLoad" type="button">一覧を読み込む</button>
+        <label class="row" style="gap:6px;margin:0 0 0 8px">
+          <input id="chkIncludeDeleted" type="checkbox">
+          <span class="mono">削除済みも表示（ADMIN 必須）</span>
+        </label>
         <span id="loadStatus" class="mono"></span>
       </div>
+
       <table class="table" id="notesTable">
-        <thead><tr><th>ID</th><th>Content</th><th>Tags</th><th>Created</th><th>Updated</th></tr></thead>
+        <thead>
+          <tr>
+            <th>ID</th><th>Content</th><th>Tags</th><th>Created</th><th>Updated</th><th>Deleted</th><th>Actions</th>
+          </tr>
+        </thead>
         <tbody></tbody>
       </table>
 
@@ -89,7 +104,7 @@
       <input id="tags" type="text" placeholder="例: project,idea">
 
       <div class="row" style="margin-top:8px">
-        <button id="btnPost" class="primary" type="button">投稿する（WRITE）</button>
+        <button id="btnPost" class="primary" type="button">投稿する（ADMIN）</button>
         <span id="postStatus" class="mono"></span>
       </div>
       <pre id="postRaw" class="code"></pre>
@@ -114,6 +129,7 @@
     const notesBody = document.querySelector("#notesTable tbody");
     const postStatus = $("postStatus");
     const postRaw = $("postRaw");
+    const chkIncludeDeleted = $("chkIncludeDeleted");
 
     $("apiShown").textContent = API_BASE;
     $("originShown").textContent = location.origin;
@@ -183,35 +199,112 @@
       healthRaw.textContent = typeof r.data === "string" ? r.data : JSON.stringify(r.data, null, 2);
     };
 
-    // /notes 一覧（READ）
-    $("btnLoad").onclick = async () => {
+    // 行レンダリング
+    function renderRow(it, hasAdmin) {
+      const tr = document.createElement("tr");
+      const td = (html)=>{const d=document.createElement("td"); d.innerHTML=(html??""); return d};
+
+      const contentHtml = it.deleted_at ? `<span class="strike">${escapeHtml(it.content||"")}</span>` : escapeHtml(it.content||"");
+      const tagsHtml = Array.isArray(it.tags)? escapeHtml(it.tags.join(",")) : "";
+
+      tr.dataset.id = it.id;
+      tr.appendChild(td(String(it.id)));
+      tr.appendChild(td(contentHtml));
+      tr.appendChild(td(tagsHtml));
+      tr.appendChild(td(escapeHtml(it.created_at||"")));
+      tr.appendChild(td(escapeHtml(it.updated_at||"")));
+      tr.appendChild(td(it.deleted_at ? `<span class="badge del">deleted</span><br><span class="muted">${escapeHtml(it.deleted_at)}</span>` : "—"));
+
+      if (hasAdmin) {
+        const btns = document.createElement("td");
+        if (it.deleted_at) {
+          btns.innerHTML = `<button class="btn-restore">復元</button>`;
+        } else {
+          btns.innerHTML = `<button class="btn-delete danger">削除</button>`;
+        }
+        tr.appendChild(btns);
+      } else {
+        tr.appendChild(td(`<span class="muted">—</span>`));
+      }
+      return tr;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // /notes 一覧
+    $("btnLoad").onclick = loadNotes;
+    async function loadNotes() {
       loadStatus.textContent = "loading...";
       notesBody.innerHTML = "";
-      const token = sessionStorage.getItem(KEY_READ) || "";
-      if (!token) { loadStatus.textContent = "READトークン未設定"; return; }
-      const r = await jreq("/notes", "GET", token);
+
+      const wantDeleted = chkIncludeDeleted.checked;
+      const hasAdminToken = !!(sessionStorage.getItem(KEY_WRITE) || "");
+      const readToken = sessionStorage.getItem(KEY_READ) || "";
+      const adminToken = sessionStorage.getItem(KEY_WRITE) || "";
+
+      // include_deleted はサーバ側で「ADMIN のみ許可」。ON時はADMINトークンで読み込む。
+      const useToken = wantDeleted ? adminToken : readToken;
+      if (!useToken) {
+        loadStatus.textContent = wantDeleted ? "ADMINトークン未設定" : "READトークン未設定";
+        return;
+      }
+
+      const qs = wantDeleted ? "?include_deleted=true" : "";
+      const r = await jreq("/notes"+qs, "GET", useToken);
       if (!r.ok) { loadStatus.textContent = `ERR(${r.status})`; return; }
+
       const rows = Array.isArray(r.data) ? r.data : (r.data?.results || []);
       if (!rows || rows.length === 0) { loadStatus.textContent = "0件"; return; }
-      for (const it of rows) {
-        const tr = document.createElement("tr");
-        const td = (t)=>{const d=document.createElement("td"); d.textContent=(t??""); return d};
-        tr.appendChild(td(it.id));
-        tr.appendChild(td(it.content));
-        tr.appendChild(td(Array.isArray(it.tags)?it.tags.join(","):""));
-        tr.appendChild(td(it.created_at));
-        tr.appendChild(td(it.updated_at));
-        notesBody.appendChild(tr);
-      }
-      loadStatus.textContent = `${rows.length}件`;
-    };
 
-    // /notes 投稿（WRITE）
+      for (const it of rows) notesBody.appendChild(renderRow(it, hasAdminToken));
+      loadStatus.textContent = `${rows.length}件`;
+    }
+
+    // Delegation: 削除／復元
+    notesBody.addEventListener("click", async (e) => {
+      const t = e.target;
+      if (!(t instanceof HTMLElement)) return;
+      const tr = t.closest("tr");
+      if (!tr) return;
+      const id = Number(tr.dataset.id || "0");
+      if (!id) return;
+
+      const admin = sessionStorage.getItem(KEY_WRITE) || "";
+      if (!admin) { alert("ADMINトークンが未設定です。"); return; }
+
+      if (t.classList.contains("btn-delete")) {
+        if (!confirm(`ID ${id} を削除します。よろしいですか？`)) return;
+        t.setAttribute("disabled","true");
+        const r = await jreq(`/notes/${id}`, "DELETE", admin);
+        t.removeAttribute("disabled");
+        if (!r.ok) { alert(`削除に失敗: ${r.status}`); return; }
+        // 楽観更新：Deleted列とボタンを差し替え
+        tr.querySelectorAll("td")[5].innerHTML = `<span class="badge del">deleted</span><br><span class="muted">${new Date().toISOString()}</span>`;
+        tr.querySelectorAll("td")[1].innerHTML = `<span class="strike">${tr.querySelectorAll("td")[1].textContent}</span>`;
+        tr.querySelectorAll("td")[6].innerHTML = `<button class="btn-restore">復元</button>`;
+      }
+
+      if (t.classList.contains("btn-restore")) {
+        t.setAttribute("disabled","true");
+        const r = await jreq(`/notes/${id}/restore`, "POST", admin);
+        t.removeAttribute("disabled");
+        if (!r.ok) { alert(`復元に失敗: ${r.status}`); return; }
+        // 返ってきた最新データで行を描画し直す
+        const it = r.data || {};
+        const hasAdminToken = true;
+        const newTr = renderRow(it, hasAdminToken);
+        tr.replaceWith(newTr);
+      }
+    });
+
+    // /notes 投稿（ADMIN）
     $("btnPost").onclick = async () => {
       postStatus.textContent = "posting...";
       postRaw.textContent = "";
       const token = sessionStorage.getItem(KEY_WRITE) || "";
-      if (!token) { postStatus.textContent = "WRITEトークン未設定"; return; }
+      if (!token) { postStatus.textContent = "ADMINトークン未設定"; return; }
       const content = $("content").value.trim();
       const tags = ($("tags").value.trim() || "")
         .split(",").map(s=>s.trim()).filter(Boolean);
