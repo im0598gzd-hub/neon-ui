@@ -3,35 +3,38 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Minimal Web UI (vA6) — READ / WRITE(ADMIN)</title>
+  <title>Minimal Web UI (vA6) — READ/ADMIN</title>
   <style>
-    :root{--bg:#0d1117;--fg:#e6edf3;--muted:#8b949e;--line:#30363d;--card:#161b22;--blue:#58a6ff;--green:#2ea043;--red:#f85149;--amber:#d29922}
+    :root{--bg:#0d1117;--fg:#e6edf3;--muted:#8b949e;--line:#30363d;--card:#161b22;--green:#2ea043;--red:#f85149;--amber:#d29922}
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    .wrap{max-width:1100px;margin:0 auto;padding:20px}
+    .wrap{max-width:1200px;margin:0 auto;padding:20px}
     h1{margin:0 0 6px;color:#79c0ff}
     .sub{color:var(--muted);margin:0 0 16px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .grid{display:grid;grid-template-columns:1fr 1.4fr;gap:16px}
     .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
     label{display:block;font-weight:600;margin:10px 0 6px}
     input,textarea{width:100%;background:#0f1420;border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:10px 12px}
     textarea{resize:vertical}
-    .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .right{margin-left:auto}
     button{background:#0f1420;border:1px solid var(--line);color:var(--fg);padding:8px 12px;border-radius:10px;cursor:pointer}
     button.primary{background:var(--green);border-color:var(--green);color:#fff}
-    button.danger{border-color:var(--red);color:var(--red)}
+    button.warn{border-color:var(--red);color:var(--red)}
     button.ghost{color:var(--muted)}
     button[disabled]{opacity:.6;cursor:not-allowed}
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted)}
     .table{width:100%;border-collapse:collapse}
     .table th,.table td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+    .table th{position:sticky;top:0;background:#121826}
     .code{background:#0b1020;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:260px}
     .pwline{display:flex;gap:6px}
-    .badge{display:inline-block;padding:2px 6px;border-radius:999px;font-size:12px;border:1px solid var(--line);color:#fff}
-    .badge.del{background:rgba(248,81,73,.15);border-color:var(--red);color:#ffaba8}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid var(--line);color:#fff}
+    .badge.del{background:transparent;border-color:var(--amber);color:var(--amber)}
     .muted{color:var(--muted)}
-    .strike{opacity:.8;text-decoration:line-through}
-    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    .small{font-size:12px}
+    .strike{opacity:.9;text-decoration:line-through}
+    @media (max-width:1020px){.grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -44,23 +47,26 @@
     <!-- 左：鍵・ヘルス -->
     <section class="card">
       <h2>🔐 鍵（Bearer）</h2>
-      <p class="mono">※ 鍵は <code>sessionStorage</code> のみ（一時保存）。<br>※ 画面共有・録画時に鍵を<strong>表示しない</strong>でください。</p>
+      <p class="mono small">
+        ※ 鍵は <code>sessionStorage</code> のみ（一時保存）。<br>
+        ※ 画面共有・録画時に鍵を<strong>表示しない</strong>でください。
+      </p>
 
       <label for="readToken">READ トークン</label>
       <div class="pwline">
-        <input id="readToken" type="password" placeholder="READ 用の Bearer 値" autocomplete="off">
+        <input id="readToken" type="password" placeholder="READ 用 Bearer 値" autocomplete="off">
         <button id="showRead" class="ghost" type="button">表示(3s)</button>
       </div>
 
-      <label for="writeToken" style="margin-top:6px">WRITE/ADMIN トークン</label>
+      <label for="adminToken" style="margin-top:6px">WRITE/ADMIN トークン</label>
       <div class="pwline">
-        <input id="writeToken" type="password" placeholder="ADMIN（削除・復元・投稿）用 Bearer 値" autocomplete="off">
-        <button id="showWrite" class="ghost" type="button">表示(3s)</button>
+        <input id="adminToken" type="password" placeholder="削除・復元・投稿 用 Bearer 値" autocomplete="off">
+        <button id="showAdmin" class="ghost" type="button">表示(3s)</button>
       </div>
 
       <div class="row" style="margin-top:8px">
         <button id="saveTokens" class="primary" type="button">鍵を保存（このタブ内）</button>
-        <button id="clearTokens" class="danger" type="button">鍵をすべて消去</button>
+        <button id="clearTokens" class="warn" type="button">鍵をすべて消去</button>
       </div>
 
       <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
@@ -75,33 +81,47 @@
 
     <!-- 右：notes 一覧 + 投稿 -->
     <section class="card">
-      <h2>🗒️ /notes（一覧）</h2>
-
       <div class="row">
-        <button id="btnLoad" type="button">一覧を読み込む</button>
-        <label class="row" style="gap:6px;margin:0 0 0 8px">
+        <h2 style="margin:0">🗒️ /notes（一覧）</h2>
+        <span class="row right" style="gap:6px">
           <input id="chkIncludeDeleted" type="checkbox">
-          <span class="mono">削除済みも表示（ADMIN 必須）</span>
-        </label>
+          <label for="chkIncludeDeleted" class="mono small" style="margin:0">削除済みも表示（ADMIN 必須）</label>
+        </span>
+      </div>
+
+      <div class="row" style="margin:8px 0 10px">
+        <button id="btnLoad" type="button">一覧を読み込む</button>
         <span id="loadStatus" class="mono"></span>
       </div>
 
-      <table class="table" id="notesTable">
-        <thead>
-          <tr>
-            <th>ID</th><th>Content</th><th>Tags</th><th>Created</th><th>Updated</th><th>Deleted</th><th>Actions</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <div style="max-height:440px;overflow:auto;border:1px solid var(--line);border-radius:10px">
+        <table class="table" id="notesTable">
+          <thead>
+            <tr>
+              <th style="width:72px">ID</th>
+              <th>Content</th>
+              <th style="width:180px">Tags</th>
+              <th style="width:190px">Created</th>
+              <th style="width:190px">Updated</th>
+              <th style="width:120px">Deleted</th>
+              <th style="width:120px">Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
 
       <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
 
-      <h2>✍️ /notes（新規投稿）</h2>
+      <h2 style="margin:0 0 6px">✍️ /notes（新規投稿）</h2>
       <label for="content">content</label>
       <textarea id="content" rows="4" placeholder="テキストを入力"></textarea>
+
       <label for="tags">tags（カンマ区切り）</label>
-      <input id="tags" type="text" placeholder="例: project,idea">
+      <div class="pwline">
+        <input id="tags" type="text" placeholder="例: project,idea">
+        <button id="showTagsNorm" class="ghost" type="button" title="現在の入力を正規化して表示（全角→半角・trim）">正規化</button>
+      </div>
 
       <div class="row" style="margin-top:8px">
         <button id="btnPost" class="primary" type="button">投稿する（ADMIN）</button>
@@ -112,17 +132,17 @@
   </main>
 
   <footer class="wrap">
-    <p class="mono">API_BASE: <code id="apiShown"></code> / Origin: <code id="originShown"></code></p>
+    <p class="mono small">API_BASE: <code id="apiShown"></code> / Origin: <code id="originShown"></code></p>
   </footer>
 
   <script>
-    // === 固定：Render API ベース ===
+    // === APIベースURL（埋め込み済み） ===
     const API_BASE = "https://neon-api-3a0h.onrender.com";
 
-    // === DOM ===
+    // === DOM参照 ===
     const $ = (id) => document.getElementById(id);
     const readInput = $("readToken");
-    const writeInput = $("writeToken");
+    const adminInput = $("adminToken");
     const healthStatus = $("healthStatus");
     const healthRaw = $("healthRaw");
     const loadStatus = $("loadStatus");
@@ -130,52 +150,45 @@
     const postStatus = $("postStatus");
     const postRaw = $("postRaw");
     const chkIncludeDeleted = $("chkIncludeDeleted");
-
     $("apiShown").textContent = API_BASE;
     $("originShown").textContent = location.origin;
 
     // === sessionStorage keys ===
-    const KEY_READ = "READ_TOKEN";
-    const KEY_WRITE = "WRITE_TOKEN";
+    const KEY_READ  = "READ_TOKEN";
+    const KEY_ADMIN = "ADMIN_TOKEN";
 
-    // 初期復元（値は表示しない）
+    // 初期復元（値はマスク表示）
     try {
-      if (sessionStorage.getItem(KEY_READ)) readInput.value = "********";
-      if (sessionStorage.getItem(KEY_WRITE)) writeInput.value = "********";
+      if (sessionStorage.getItem(KEY_READ))  readInput.value  = "********";
+      if (sessionStorage.getItem(KEY_ADMIN)) adminInput.value = "********";
     } catch {}
 
     // 3秒だけ表示
     function reveal3s(input, getter) {
-      const val = getter();
-      if (!val) return;
-      const t = input.type;
-      const prev = input.value;
-      input.type = "text";
-      input.value = val;
-      setTimeout(() => { input.type = t; input.value = "********"; }, 3000);
+      const val = getter(); if (!val) return;
+      input.type = "text"; const prev = input.value; input.value = val;
+      setTimeout(() => { input.type = "password"; input.value = "********"; }, 3000);
     }
-    $("showRead").onclick = () => reveal3s(readInput, () => sessionStorage.getItem(KEY_READ) || "");
-    $("showWrite").onclick = () => reveal3s(writeInput, () => sessionStorage.getItem(KEY_WRITE) || "");
+    $("showRead").onclick  = () => reveal3s(readInput,  () => sessionStorage.getItem(KEY_READ)  || "");
+    $("showAdmin").onclick = () => reveal3s(adminInput, () => sessionStorage.getItem(KEY_ADMIN) || "");
 
-    // 保存
+    // 保存/消去
     $("saveTokens").onclick = () => {
-      const r = readInput.value.includes("*") ? (sessionStorage.getItem(KEY_READ) || "") : readInput.value.trim();
-      const w = writeInput.value.includes("*") ? (sessionStorage.getItem(KEY_WRITE) || "") : writeInput.value.trim();
-      if (r) sessionStorage.setItem(KEY_READ, r);
-      if (w) sessionStorage.setItem(KEY_WRITE, w);
+      const r = readInput.value.includes("*")  ? (sessionStorage.getItem(KEY_READ)  || "") : readInput.value.trim();
+      const a = adminInput.value.includes("*") ? (sessionStorage.getItem(KEY_ADMIN) || "") : adminInput.value.trim();
+      if (r) sessionStorage.setItem(KEY_READ,  r);
+      if (a) sessionStorage.setItem(KEY_ADMIN, a);
       alert("鍵を保存しました（このタブ内）");
-      if (r) readInput.value = "********";
-      if (w) writeInput.value = "********";
+      if (r) readInput.value  = "********";
+      if (a) adminInput.value = "********";
     };
-
-    // すべて消去
     $("clearTokens").onclick = () => {
       try { sessionStorage.clear(); } catch {}
-      readInput.value = ""; writeInput.value = "";
+      readInput.value = ""; adminInput.value = "";
       alert("鍵をすべて消去しました。");
     };
 
-    // fetch ユーティリティ（キーは渡されたときのみ付与）
+    // fetch ユーティリティ
     async function jreq(path, method="GET", token="", body=null) {
       const url = API_BASE + path;
       const headers = {"Content-Type":"application/json"};
@@ -199,122 +212,112 @@
       healthRaw.textContent = typeof r.data === "string" ? r.data : JSON.stringify(r.data, null, 2);
     };
 
-    // 行レンダリング
-    function renderRow(it, hasAdmin) {
-      const tr = document.createElement("tr");
-      const td = (html)=>{const d=document.createElement("td"); d.innerHTML=(html??""); return d};
+    // HTMLエスケープ
+    function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
+    // 行レンダリング
+    function renderRow(it, hasAdmin){
+      const tr = document.createElement("tr"); tr.dataset.id = String(it.id||"");
+      const td = (html)=>{const d=document.createElement("td"); d.innerHTML=(html??""); return d};
       const contentHtml = it.deleted_at ? `<span class="strike">${escapeHtml(it.content||"")}</span>` : escapeHtml(it.content||"");
       const tagsHtml = Array.isArray(it.tags)? escapeHtml(it.tags.join(",")) : "";
-
-      tr.dataset.id = it.id;
-      tr.appendChild(td(String(it.id)));
+      tr.appendChild(td(String(it.id ?? "")));
       tr.appendChild(td(contentHtml));
       tr.appendChild(td(tagsHtml));
       tr.appendChild(td(escapeHtml(it.created_at||"")));
       tr.appendChild(td(escapeHtml(it.updated_at||"")));
-      tr.appendChild(td(it.deleted_at ? `<span class="badge del">deleted</span><br><span class="muted">${escapeHtml(it.deleted_at)}</span>` : "—"));
-
-      if (hasAdmin) {
-        const btns = document.createElement("td");
-        if (it.deleted_at) {
-          btns.innerHTML = `<button class="btn-restore">復元</button>`;
-        } else {
-          btns.innerHTML = `<button class="btn-delete danger">削除</button>`;
-        }
-        tr.appendChild(btns);
+      tr.appendChild(td(it.deleted_at ? `<span class="badge del">deleted</span><br><span class="muted small">${escapeHtml(it.deleted_at)}</span>` : "—"));
+      if (hasAdmin){
+        const cell=document.createElement("td");
+        cell.innerHTML = it.deleted_at ? `<button class="btn-restore">復元</button>` : `<button class="btn-delete warn">削除</button>`;
+        tr.appendChild(cell);
       } else {
         tr.appendChild(td(`<span class="muted">—</span>`));
       }
       return tr;
     }
 
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    }
-
-    // /notes 一覧
+    // 一覧読み込み（トグルON=ADMINでinclude_deleted、OFF=READで通常）
     $("btnLoad").onclick = loadNotes;
-    async function loadNotes() {
+    chkIncludeDeleted.onchange = loadNotes;
+
+    async function loadNotes(){
       loadStatus.textContent = "loading...";
       notesBody.innerHTML = "";
 
-      const wantDeleted = chkIncludeDeleted.checked;
-      const hasAdminToken = !!(sessionStorage.getItem(KEY_WRITE) || "");
-      const readToken = sessionStorage.getItem(KEY_READ) || "";
-      const adminToken = sessionStorage.getItem(KEY_WRITE) || "";
+      const wantDeleted = !!chkIncludeDeleted.checked;
+      const readTok  = sessionStorage.getItem(KEY_READ)  || "";
+      const adminTok = sessionStorage.getItem(KEY_ADMIN) || "";
 
-      // include_deleted はサーバ側で「ADMIN のみ許可」。ON時はADMINトークンで読み込む。
-      const useToken = wantDeleted ? adminToken : readToken;
-      if (!useToken) {
+      const useTok = wantDeleted ? adminTok : readTok;
+      if (!useTok){
         loadStatus.textContent = wantDeleted ? "ADMINトークン未設定" : "READトークン未設定";
         return;
       }
 
       const qs = wantDeleted ? "?include_deleted=true" : "";
-      const r = await jreq("/notes"+qs, "GET", useToken);
-      if (!r.ok) { loadStatus.textContent = `ERR(${r.status})`; return; }
+      const r = await jreq("/notes"+qs, "GET", useTok);
+      if (!r.ok){ loadStatus.textContent = `ERR(${r.status})`; return; }
 
       const rows = Array.isArray(r.data) ? r.data : (r.data?.results || []);
-      if (!rows || rows.length === 0) { loadStatus.textContent = "0件"; return; }
+      if (!rows || rows.length===0){ loadStatus.textContent = "0件"; return; }
 
-      for (const it of rows) notesBody.appendChild(renderRow(it, hasAdminToken));
+      const hasAdmin = !!adminTok;
+      for (const it of rows) notesBody.appendChild(renderRow(it, hasAdmin));
       loadStatus.textContent = `${rows.length}件`;
     }
 
-    // Delegation: 削除／復元
-    notesBody.addEventListener("click", async (e) => {
-      const t = e.target;
-      if (!(t instanceof HTMLElement)) return;
-      const tr = t.closest("tr");
-      if (!tr) return;
-      const id = Number(tr.dataset.id || "0");
-      if (!id) return;
+    // 削除/復元（イベント委譲）
+    notesBody.addEventListener("click", async (e)=>{
+      const t = e.target; if (!(t instanceof HTMLElement)) return;
+      const tr = t.closest("tr"); if (!tr) return;
+      const id = Number(tr.dataset.id||"0"); if (!id) return;
 
-      const admin = sessionStorage.getItem(KEY_WRITE) || "";
-      if (!admin) { alert("ADMINトークンが未設定です。"); return; }
+      const admin = sessionStorage.getItem(KEY_ADMIN) || "";
+      if (!admin){ alert("ADMINトークンが未設定です。"); return; }
 
-      if (t.classList.contains("btn-delete")) {
+      if (t.classList.contains("btn-delete")){
         if (!confirm(`ID ${id} を削除します。よろしいですか？`)) return;
         t.setAttribute("disabled","true");
         const r = await jreq(`/notes/${id}`, "DELETE", admin);
         t.removeAttribute("disabled");
-        if (!r.ok) { alert(`削除に失敗: ${r.status}`); return; }
-        // 楽観更新：Deleted列とボタンを差し替え
-        tr.querySelectorAll("td")[5].innerHTML = `<span class="badge del">deleted</span><br><span class="muted">${new Date().toISOString()}</span>`;
-        tr.querySelectorAll("td")[1].innerHTML = `<span class="strike">${tr.querySelectorAll("td")[1].textContent}</span>`;
-        tr.querySelectorAll("td")[6].innerHTML = `<button class="btn-restore">復元</button>`;
+        if (!r.ok){ alert(`削除に失敗: ${r.status}`); return; }
+        await loadNotes(); // 現在のトグル状態を保ったまま再読込（＝復元後も残る仕様と整合）
       }
 
-      if (t.classList.contains("btn-restore")) {
+      if (t.classList.contains("btn-restore")){
         t.setAttribute("disabled","true");
         const r = await jreq(`/notes/${id}/restore`, "POST", admin);
         t.removeAttribute("disabled");
-        if (!r.ok) { alert(`復元に失敗: ${r.status}`); return; }
-        // 返ってきた最新データで行を描画し直す
-        const it = r.data || {};
-        const hasAdminToken = true;
-        const newTr = renderRow(it, hasAdminToken);
-        tr.replaceWith(newTr);
+        if (!r.ok){ alert(`復元に失敗: ${r.status}`); return; }
+        await loadNotes(); // 復元後に“そのまま”表示を維持
       }
     });
 
-    // /notes 投稿（ADMIN）
-    $("btnPost").onclick = async () => {
+    // 投稿
+    $("btnPost").onclick = async ()=>{
       postStatus.textContent = "posting...";
       postRaw.textContent = "";
-      const token = sessionStorage.getItem(KEY_WRITE) || "";
-      if (!token) { postStatus.textContent = "ADMINトークン未設定"; return; }
+      const admin = sessionStorage.getItem(KEY_ADMIN) || "";
+      if (!admin){ postStatus.textContent = "ADMINトークン未設定"; return; }
       const content = $("content").value.trim();
-      const tags = ($("tags").value.trim() || "")
-        .split(",").map(s=>s.trim()).filter(Boolean);
-      const r = await jreq("/notes", "POST", token, {content, tags});
+      const tags = ($("tags").value.trim()||"").split(",").map(s=>s.trim()).filter(Boolean);
+      const r = await jreq("/notes", "POST", admin, {content, tags});
       postStatus.textContent = r.ok ? "OK" : `ERR(${r.status})`;
       postRaw.textContent = typeof r.data === "string" ? r.data : JSON.stringify(r.data, null, 2);
-      if (r.ok) $("btnLoad").click(); // 成功したら一覧を更新
+      if (r.ok) loadNotes();
     };
 
-    // 重要：鍵を console.log や URL に出さない（何も出力しない）
+    // タグ正規化プレビュー
+    $("showTagsNorm").onclick = ()=>{
+      const raw = $("tags").value;
+      const norm = raw.split(",").map(s=>s.trim()).filter(Boolean)
+        .map(x=>x.replace(/[\uFF01-\uFF5E]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0)))
+        .map(x=>/^[A-Za-z0-9]+$/.test(x)? x.toLowerCase(): x);
+      alert(norm.join(", "));
+    };
+
+    // 重要：鍵はconsoleに出さない・URLパラメータに載せない
   </script>
 </body>
 </html>
