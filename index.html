@@ -26,6 +26,8 @@
     .table th,.table td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
     .code{background:#0b1020;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:260px}
     .pwline{display:flex;gap:6px}
+    /* ← 追加：削除済み行の灰色化 */
+    .deleted-row{opacity:.55;background:#20252e}
     @media (max-width:900px){.grid{grid-template-columns:1fr}}
   </style>
 </head>
@@ -127,39 +129,56 @@
       $("healthStatus").textContent=r.ok?"OK":"ERR"; $("healthRaw").textContent=JSON.stringify(r.data,null,2);
     };
 
+    // 一覧読込：include_deleted=true を正しく付ける
     $("btnLoad").onclick=async()=>{
       $("loadStatus").textContent="loading...";
-      const token=sessionStorage.getItem(KEY_READ)||sessionStorage.getItem(KEY_WRITE)||"";
-      const showDel=$("showDeleted").checked;
-      const r=await jreq(`/notes?showDeleted=${showDel?"1":"0"}`,"GET",token);
+      const read=sessionStorage.getItem(KEY_READ)||"";
+      const write=sessionStorage.getItem(KEY_WRITE)||"";
+      const token= read || write; // どちらかあればOK（adminなら削除済みも見える）
+      const includeDel = $("showDeleted").checked ? "&include_deleted=true" : "";
+      const r=await jreq(`/notes?order_by=updated_at&order=desc${includeDel}`,"GET",token);
       const body=$("notesTable").querySelector("tbody"); body.innerHTML="";
       if(!r.ok){$("loadStatus").textContent="ERR";return;}
-      const rows=r.data.results||r.data;
+      const rows=Array.isArray(r.data)?r.data:(r.data.results||[]);
       rows.forEach(it=>{
         const tr=document.createElement("tr");
-        tr.innerHTML=`<td>${it.id}</td><td>${it.content}</td><td>${it.tags}</td>
-        <td>${it.created_at||""}</td><td>${it.updated_at||""}</td>
-        <td>${it.deleted_at||""}</td><td>${it.deleted_at?
-          `<button data-id="${it.id}" class="restore">復元</button>`:
-          `<button data-id="${it.id}" class="danger delete">削除</button>`}</td>`;
+        const isDeleted = it.deleted_at !== null && it.deleted_at !== undefined;
+        if(isDeleted) tr.className="deleted-row";
+        const tags = Array.isArray(it.tags) ? it.tags.join(",") : (it.tags ?? "");
+        tr.innerHTML=`
+          <td>${it.id}</td>
+          <td>${it.content ?? ""}</td>
+          <td>${tags}</td>
+          <td>${it.created_at ?? ""}</td>
+          <td>${it.updated_at ?? ""}</td>
+          <td>${it.deleted_at ?? ""}</td>
+          <td>${
+            isDeleted
+              ? `<button data-id="${it.id}" class="restore">復元</button>`
+              : `<button data-id="${it.id}" class="danger delete">削除</button>`
+          }</td>`;
         body.appendChild(tr);
       });
       $("loadStatus").textContent=`${rows.length}件`;
       document.querySelectorAll(".delete").forEach(btn=>btn.onclick=()=>act(btn.dataset.id,"DELETE"));
-      document.querySelectorAll(".restore").forEach(btn=>btn.onclick=()=>act(btn.dataset.id,"PATCH"));
+      document.querySelectorAll(".restore").forEach(btn=>btn.onclick=()=>act(btn.dataset.id,"RESTORE"));
     };
 
+    // DELETE / POST /notes/:id/restore
     async function act(id,mode){
       const token=sessionStorage.getItem(KEY_WRITE)||"";
-      if(!token)return alert("トークン未設定");
-      if(mode==="DELETE")await jreq(`/notes/${id}`,"DELETE",token);
-      if(mode==="PATCH")await jreq(`/notes/${id}/restore`,"PATCH",token);
+      if(!token)return alert("トークン未設定（WRITE/ADMIN）");
+      if(mode==="DELETE") await jreq(`/notes/${id}`,"DELETE",token);
+      if(mode==="RESTORE") await jreq(`/notes/${id}/restore`,"POST",token);
       $("btnLoad").click();
     }
 
     $("btnPost").onclick=async()=>{
       const token=sessionStorage.getItem(KEY_WRITE)||""; if(!token)return alert("未設定");
-      const content=$("content").value.trim(), tags=$("tags").value.split(",").map(s=>s.trim()).filter(Boolean);
+      const content=$("content").value.trim();
+      const tags=$("tags").value.split(",").map(s=>s.trim()).filter(Boolean);
+      if(!content){alert("content は必須です"); return;}
+      if(tags.length===0){alert("tags を1つ以上入力してください"); return;}
       const r=await jreq("/notes","POST",token,{content,tags});
       $("postRaw").textContent=JSON.stringify(r.data,null,2);
       $("btnLoad").click();
