@@ -26,8 +26,9 @@
     .table th,.table td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
     .code{background:#0b1020;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:260px}
     .pwline{display:flex;gap:6px}
-    /* ← 追加：削除済み行の灰色化 */
-    .deleted-row{opacity:.55;background:#20252e}
+    /* 強化: 灰色化を確実に（!important で上書き力UP） */
+    .table tr.deleted-row { background:#20252e !important; opacity:.55 !important; }
+    .table tr.deleted-row td { filter:saturate(.7); }
     @media (max-width:900px){.grid{grid-template-columns:1fr}}
   </style>
 </head>
@@ -140,10 +141,16 @@
       const body=$("notesTable").querySelector("tbody"); body.innerHTML="";
       if(!r.ok){$("loadStatus").textContent="ERR";return;}
       const rows=Array.isArray(r.data)?r.data:(r.data.results||[]);
+
       rows.forEach(it=>{
         const tr=document.createElement("tr");
-        const isDeleted = it.deleted_at !== null && it.deleted_at !== undefined;
-        if(isDeleted) tr.className="deleted-row";
+        const isDeleted = it.deleted_at !== null && it.deleted_at !== undefined && it.deleted_at !== "";
+        // クラス付与＋インラインスタイル（確実化）
+        if(isDeleted){
+          tr.classList.add("deleted-row");
+          tr.style.backgroundColor = "#20252e";
+          tr.style.opacity = "0.55";
+        }
         const tags = Array.isArray(it.tags) ? it.tags.join(",") : (it.tags ?? "");
         tr.innerHTML=`
           <td>${it.id}</td>
