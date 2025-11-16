@@ -26,7 +26,6 @@
     .table th,.table td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
     .code{background:#0b1020;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:260px}
     .pwline{display:flex;gap:6px}
-    /* 強化: 灰色化を確実に（!important で上書き力UP） */
     .table tr.deleted-row { background:#20252e !important; opacity:.55 !important; }
     .table tr.deleted-row td { filter:saturate(.7); }
     @media (max-width:900px){.grid{grid-template-columns:1fr}}
@@ -39,7 +38,6 @@
   </header>
 
   <main class="wrap grid">
-    <!-- 鍵セクション -->
     <section class="card">
       <h2>🔐 鍵（Bearer）</h2>
       <p class="mono">※ sessionStorage のみ保存<br>※ 画面共有・録画時に鍵を<strong>表示しない</strong>でください。</p>
@@ -71,7 +69,6 @@
       <pre id="healthRaw" class="code"></pre>
     </section>
 
-    <!-- notes セクション -->
     <section class="card">
       <h2>🗒️ /notes（一覧・投稿・削除・復元）</h2>
       <div class="row">
@@ -130,12 +127,11 @@
       $("healthStatus").textContent=r.ok?"OK":"ERR"; $("healthRaw").textContent=JSON.stringify(r.data,null,2);
     };
 
-    // 一覧読込：include_deleted=true を正しく付ける
     $("btnLoad").onclick=async()=>{
       $("loadStatus").textContent="loading...";
       const read=sessionStorage.getItem(KEY_READ)||"";
       const write=sessionStorage.getItem(KEY_WRITE)||"";
-      const token= read || write; // どちらかあればOK（adminなら削除済みも見える）
+      const token = write || read;  /* ← 修正済み！！ */
       const includeDel = $("showDeleted").checked ? "&include_deleted=true" : "";
       const r=await jreq(`/notes?order_by=updated_at&order=desc${includeDel}`,"GET",token);
       const body=$("notesTable").querySelector("tbody"); body.innerHTML="";
@@ -145,7 +141,6 @@
       rows.forEach(it=>{
         const tr=document.createElement("tr");
         const isDeleted = it.deleted_at !== null && it.deleted_at !== undefined && it.deleted_at !== "";
-        // クラス付与＋インラインスタイル（確実化）
         if(isDeleted){
           tr.classList.add("deleted-row");
           tr.style.backgroundColor = "#20252e";
@@ -171,7 +166,6 @@
       document.querySelectorAll(".restore").forEach(btn=>btn.onclick=()=>act(btn.dataset.id,"RESTORE"));
     };
 
-    // DELETE / POST /notes/:id/restore
     async function act(id,mode){
       const token=sessionStorage.getItem(KEY_WRITE)||"";
       if(!token)return alert("トークン未設定（WRITE/ADMIN）");
