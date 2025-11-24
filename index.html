@@ -131,8 +131,14 @@
       $("loadStatus").textContent="loading...";
       const read=sessionStorage.getItem(KEY_READ)||"";
       const write=sessionStorage.getItem(KEY_WRITE)||"";
-      const token = write || read;  /* ← 修正済み！！ */
-      const includeDel = $("showDeleted").checked ? "&include_deleted=true" : "";
+      const token = write || read;
+
+      /* ✅ 修正済み — WRITEなら自動で include_deleted=true */
+      const includeDel =
+        sessionStorage.getItem(KEY_WRITE)
+          ? "&include_deleted=true"
+          : ($("showDeleted").checked ? "&include_deleted=true" : "");
+
       const r=await jreq(`/notes?order_by=updated_at&order=desc${includeDel}`,"GET",token);
       const body=$("notesTable").querySelector("tbody"); body.innerHTML="";
       if(!r.ok){$("loadStatus").textContent="ERR";return;}
